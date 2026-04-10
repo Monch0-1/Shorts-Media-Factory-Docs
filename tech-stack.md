@@ -4,18 +4,24 @@
 
 ---
 
-### FastAPI (Python 3.12)
-The API layer needs to be async-native — video generation is a long-running background task, not a synchronous operation. FastAPI's `BackgroundTasks`, native Pydantic validation, and automatic OpenAPI documentation made it the clear choice over Flask or Django REST Framework. The Pydantic integration also enforces strict input validation at the boundary without boilerplate.
+### AI Language Models (Gemini + Claude)
+Script generation requires a model that can follow complex structured output schemas while maintaining creative quality and narrative consistency. The pipeline supports multiple providers behind a common interface — Gemini and Claude are both first-class citizens.
 
----
+**Gemini** is the default primary provider. Its native JSON mode (`response_mime_type=application/json`) returns structured output without prompt-engineering workarounds, and its context window handles long-form multi-turn scripts reliably. The free tier makes it cost-effective for development and low-volume production.
 
-### Google Gemini
-Script generation requires a model that can follow complex structured output schemas while maintaining creative quality and narrative consistency. Gemini's native JSON mode (`response_mime_type=application/json`) returns structured output directly without prompt-hacking, and its context window handles long-form multi-turn scripts reliably.
+**Claude (Anthropic)** serves as the fallback provider. When Gemini hits quota limits or experiences overload, the pipeline automatically retries via Claude without surfacing the error to the user. Claude is also available as the primary provider for higher-fidelity use cases (configurable per plan in a future release).
+
+The provider chain is a single environment variable change — no code required to swap or reorder providers. See [LLM Providers](architecture/llm-providers.md).
 
 ---
 
 ### ElevenLabs
-Two reasons: voice quality and sound effects. ElevenLabs produces the most natural-sounding AI voices currently available — a critical requirement when the output is a video people will watch on TikTok. It also provides an SFX generation API for cases where the local sound effects library doesn't have a match, giving the pipeline a reliable fallback with no manual intervention.
+Two reasons: voice quality and sound effects. ElevenLabs produces the most natural-sounding AI voices currently available — a critical requirement when the output is a video people will watch on TikTok. It also provides an SFX generation API for cases where the local sound effects library does not have a match, giving the pipeline a reliable fallback with no manual intervention.
+
+---
+
+### FastAPI (Python 3.12)
+The API layer needs to be async-native — video generation is a long-running background task, not a synchronous operation. FastAPI's `BackgroundTasks`, native Pydantic validation, and automatic OpenAPI documentation made it the clear choice over Flask or Django REST Framework. The Pydantic integration also enforces strict input validation at the boundary without boilerplate.
 
 ---
 
@@ -45,5 +51,5 @@ MoviePy's built-in `TextClip` depends on ImageMagick, which is an additional sys
 |---|---|---|
 | Celery + Redis | Background job queue | Deferred — `BackgroundTasks` is sufficient for single-server; Celery queues added when horizontal scaling is needed |
 | Whisper | Subtitle generation from audio | Deferred — subtitle timing from synthesis timestamps is more precise than transcription |
-| OpenAI GPT-4 | Script generation | Gemini's native JSON mode and competitive pricing favored for structured output use case |
+| OpenAI GPT-4 | Script generation | Not adopted — Gemini native JSON mode and Claude's instruction-following quality covered the use case without adding a third provider dependency |
 | S3 | Video file storage | Designed in (download endpoint returns URL shape compatible with S3 pre-signed URLs); swap is one file change |
