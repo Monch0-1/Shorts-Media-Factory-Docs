@@ -35,7 +35,8 @@
                           │       Video Pipeline           │
                           │                               │
                           │  1. Script Generation         │
-                          │     └─ Google Gemini          │
+                          │     └─ LLM Provider Chain     │
+                          │        (Gemini → Claude)      │
                           │  2. Audio Synthesis           │
                           │     └─ ElevenLabs TTS         │
                           │  3. SFX Selection & Timing    │
@@ -65,6 +66,11 @@ In-process job dictionaries were the initial prototype. PostgreSQL was adopted e
 
 ### Deterministic output paths
 Output files are named `{sanitized_topic}_{job_id}.mp4`. The `job_id` suffix eliminates race conditions when two users generate the same topic simultaneously.
+
+### LLM Provider abstraction
+Script generation is decoupled from any specific AI provider via a provider interface. The pipeline does not know which model it is calling — it calls the interface. A configurable fallback chain attempts providers in order, automatically recovering from transient quota or overload errors (429/503) without surfacing failures to the user. The default order is cost-optimised (cheaper providers first); the order is a single environment variable change.
+
+See [LLM Providers](llm-providers.md) for the full design.
 
 ### Dual operating modes
 `APP_MODE=DEBUG` swaps real AI APIs for local mock services — pre-recorded audio, pre-written scripts. This makes the full pipeline testable without incurring API costs or network dependency.
