@@ -29,7 +29,7 @@ FallbackChain
        raise — surface error to caller
 ```
 
-**Transient errors (429, 503) trigger the next provider.** Non-transient errors (bad schema, auth failure) abort immediately — no point retrying a different provider for a programming error.
+**Transient errors (429, 503) trigger the next provider.** Non-transient errors (bad schema, auth failure, content policy refusal) abort immediately — no point retrying a different provider for a policy decision.
 
 ---
 
@@ -40,7 +40,7 @@ FallbackChain
 | Gemini | `gemini-2.5-flash` | Native — `response_mime_type=application/json` + schema |
 | Claude | `claude-haiku-4-5-20251001` | Prompt-based — schema injected into system instruction |
 
-Each provider maps transient quota/overload errors to a common `LLMUnavailableError` type that the fallback chain understands. All other errors propagate as-is.
+Each provider maps transient quota/overload errors to a common `LLMUnavailableError` type that the fallback chain understands. Content policy refusals map to `ContentPolicyError` — this bypasses the fallback chain entirely (same prompt refused by all providers, no retry) and marks the job as `rejected`.
 
 ---
 
@@ -52,19 +52,24 @@ The provider chain is driven entirely by environment variables — no code chang
 # Provider order: left → right, tried in sequence on 429/503
 LLM_PROVIDERS=gemini,claude
 
-# Model overrides
-GEMINI_MODEL=gemini-2.5-flash
-CLAUDE_MODEL=claude-haiku-4-5-20251001
-
 # API keys — omit a key to exclude that provider from the chain entirely
 GEMINI_API_KEY=...
 ANTHROPIC_API_KEY=...
 ```
 
-To prefer Claude (e.g. during a Gemini outage, or for a higher-quality tier):
-```
-LLM_PROVIDERS=claude,gemini
-```
+---
+
+## Per-Plan Model Selection
+
+The factory builds a plan-appropriate chain at request time based on the authenticated user's plan. The `llm_tier` request field can override the default, subject to plan ceiling enforcement.
+
+| Plan | Default tier | Maximum tier |
+|---|---|---|
+| `free` | Gemini / Haiku | Haiku |
+| `pro` | Gemini / Sonnet | Sonnet |
+| `enterprise` | Gemini / Opus | Opus |
+
+Requesting a tier above the plan ceiling returns `403`. The pipeline and provider interface are unchanged — only the chain construction in the factory varies by plan.
 
 ---
 
@@ -75,20 +80,7 @@ LLM_PROVIDERS=claude,gemini
 | Primary returns 429 | Fallback to next provider, log warning |
 | Primary returns 503 | Fallback to next provider, log warning |
 | Primary succeeds | Result returned, secondary never called |
-| All providers return 429/503 | Last error raised, job marked failed |
+| All providers return 429/503 | Last error raised, job marked `failed` |
+| Any provider returns content policy refusal | `ContentPolicyError` raised, job marked `rejected`, base rate charged |
 | Any provider returns non-transient error | Error propagates immediately, fallback chain aborts |
 | Primary returns empty/blocked response | Raises explicitly — does not silently return null |
-
----
-
-## Future: Per-Plan Model Selection
-
-The current chain is global — all jobs use the same provider order. Once the auth sprint lands and user plans exist, the factory will read `user.plan` to build a plan-appropriate chain:
-
-| Plan | Default chain |
-|---|---|
-| Free | Gemini → Claude Haiku |
-| Pro | Claude Sonnet → Gemini |
-| Enterprise | Claude Opus → Claude Sonnet |
-
-No changes to the pipeline or the interface are required for this — only the chain construction logic in the factory changes.
