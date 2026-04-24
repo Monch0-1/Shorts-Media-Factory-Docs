@@ -8,7 +8,7 @@ Every video generation request maps to a single `JobRecord` that persists indefi
 
 ```
 POST /v1/video/generate
-         │
+         │  balance check passes
          ▼
       [queued]  ◄── Created synchronously. job_id returned to client.
          │
@@ -16,13 +16,13 @@ POST /v1/video/generate
          ▼
     [processing]  ◄── Pipeline running. Client polls status.
          │
-    ┌────┴────┐
-    │         │
-    ▼         ▼
-[completed] [failed]
-    │
-    │  VIDEO_RETENTION_HOURS elapsed (default 72h)
-    │  Cleanup job deletes file
+    ┌────┴──────────────┐
+    │ success           │ content policy refusal   │ failure
+    ▼                   ▼                           ▼
+[completed]        [rejected]                   [failed]
+    │               (base rate charged)
+    │  VIDEO_RETENTION_HOURS elapsed
+    │  Hourly cleanup job runs
     ▼
  [expired]  ◄── Record kept. File gone. Download returns 404.
 ```
@@ -32,7 +32,7 @@ POST /v1/video/generate
 ## What each state means for the client
 
 ### `queued`
-Job accepted. Pipeline has not started yet. Check back shortly.
+Job accepted, credits reserved. Pipeline has not started yet. Check back shortly.
 
 ### `processing`
 Pipeline is running. Script is being generated, audio synthesized, video assembled. Typical duration: 30–120 seconds depending on script length and API response times.
@@ -40,11 +40,14 @@ Pipeline is running. Script is being generated, audio synthesized, video assembl
 ### `completed`
 Video is ready. `result_url` is present in the status response. Use the download endpoint to get the file URL.
 
+### `rejected`
+The topic was refused by the content policy system — all configured LLM providers declined to generate a script for this prompt. A base processing fee is charged. The `error` field contains the user-facing reason. The job record is permanent and appears in history.
+
 ### `failed`
-Something went wrong during pipeline execution. The `error` field in the status response contains a description. The job record is permanent — failed jobs appear in job history.
+Something went wrong during pipeline execution (infrastructure error, unexpected API failure). No credits are charged — the failure is on the platform, not the user. The `error` field contains a description.
 
 ### `expired`
-The video was completed but the retention window has passed. The file has been deleted. The job record remains in history with metadata (topic, theme, timestamp) — only the file is gone.
+The video was completed but the retention window has passed. The file has been deleted by the hourly cleanup job. The job record remains in history with metadata (topic, theme, timestamp) — only the file is gone.
 
 ---
 
@@ -58,7 +61,7 @@ loop:
     if status == "completed":
         GET /v1/video/download/{job_id}  →  { url, expires_in }
         break
-    if status == "failed":
+    if status in ("failed", "rejected"):
         handle error
         break
     wait 5s
@@ -70,9 +73,7 @@ No webhook is required. In-app notification is implemented by polling — no add
 
 ## Retention and storage
 
-- Default retention: **72 hours** from job completion
-- After expiry: video file deleted, `JobRecord` status set to `expired`
-- Job records are never deleted — full history is always available
+- Default retention: **72 hours** from job completion (`VIDEO_RETENTION_HOURS` env var)
+- Cleanup: hourly APScheduler job — finds completed jobs past `expires_at`, deletes file, transitions to `expired`
+- Job records are never deleted — full history always available
 - Storage is intentionally lightweight — this is not a video hosting platform
-
-The retention window is configurable via `VIDEO_RETENTION_HOURS` without a code change.
