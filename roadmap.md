@@ -1,6 +1,6 @@
 # Roadmap
 
-## Current state (v0.3.0 — Local_Provider_Layer)
+## Current state (v0.2.1 — Local_Provider_Layer)
 
 - Clerk JWT authentication (RS256 / JWKS, `email_verified` enforced, lazy user creation)
 - Credit ledger — append-only `credits_ledger`, `SELECT FOR UPDATE` double-spend guard, 100k beta seed
