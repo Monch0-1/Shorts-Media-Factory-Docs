@@ -121,6 +121,19 @@ The download URL becomes available. The video is retained for `VIDEO_RETENTION_H
 
 ---
 
+## Campaign Workflow (bring-your-own media)
+
+The campaign format (`POST /v1/campaign/generate`) reuses the same audio, VFX and render stages, with a different front half and background:
+
+1. **Validate and charge** — plan and access gate, rate limit, then an atomic upfront credit charge
+2. **Resolve and probe media** — every referenced upload is content-checked before any paid call, so a bad asset fails fast
+3. **Section-aware script** — narration is generated for all sections at once, then checked against each section's own context; drifting sections are reworked
+4. **Audio** — the same voice and SFX stages as the topic workflow
+5. **Section backgrounds** — each section's media is timed to that section's narration; images and videos are framed for vertical output without cropping landscape sources
+6. **Render and reconcile** — final render, then the upfront charge is reconciled against real cost; a failure at any stage refunds in full
+
+---
+
 ## Operating Modes
 
 | Mode | Script source | Audio source | Use case |

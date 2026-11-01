@@ -149,6 +149,48 @@ Returns the current credit balance for a user. Only the owning user may query th
 
 ---
 
+### POST /v1/campaign/media
+Upload media for a campaign. Multipart form, field `files` (images and/or videos). Pro and Enterprise plans only.
+
+- Files are classified by **content**, never by filename or extension; client filenames are never stored
+- Uploads are scoped to the caller — another user's asset ids are indistinguishable from unknown ones
+- All-or-nothing per call: if any file is rejected, nothing is persisted
+- Per-user storage quota; uploads expire automatically after the retention window
+
+```json
+{ "asset_ids": ["9f1c...", "a03b..."] }
+```
+
+Errors: `403` (plan / not enabled), `400 invalid_media` (the offending file index is reported; internal probe details are not), `413` (request too large or `upload_quota_exceeded`).
+
+---
+
+### POST /v1/campaign/generate
+Queue a campaign video. Returns `202` with a `job_id`; poll `GET /v1/video/status/{job_id}` as for any other job.
+
+```json
+{
+  "narration_style": "monologue",
+  "theme": "default",
+  "llm_tier": "auto",
+  "sections": [
+    { "context": "What this section is about...", "media": [{ "asset_id": "9f1c..." }] },
+    { "context": "A section with no media.", "no_media": true }
+  ],
+  "options": { "content": { "include_sfx": true }, "vfx": {}, "subtitles": {} }
+}
+```
+
+- Each section carries the client's own context and an ordered list of uploaded media (or `no_media`)
+- Narration must stay faithful to the supplied context — sections that drift are reworked before audio is generated
+- Video length is emergent (driven by the narration), not requested; a maximum applies
+- Credits are charged upfront, then reconciled to the real cost after delivery (refund, or a top-up capped at the user's balance). Any failure on our side is a full refund
+- Media may only reference the caller's own uploads (`asset_id`); anything else is rejected with `422`
+
+Errors: `402` insufficient credits, `403` plan / not enabled / tier ceiling, `422` invalid request, `429` rate limit (shared with `/v1/video/generate`).
+
+---
+
 ### POST /v1/webhooks/clerk
 Clerk lifecycle webhook. Handles `user.created` — idempotent user creation and credit seeding. Svix signature verified in PROD; skipped in DEBUG.
 
@@ -180,6 +222,7 @@ All error responses follow the same shape:
 | `402` | Insufficient credits |
 | `403` | Forbidden — plan ceiling exceeded, email not verified, or beta allowlist rejection |
 | `404` | Job not found, not completed, expired, or belongs to another user |
+| `413` | Upload too large or per-user storage quota exceeded |
 | `422` | Request body schema violation |
 | `429` | Rate limit exceeded — `Retry-After` header included |
 | `500` | Internal server error |

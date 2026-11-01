@@ -1,9 +1,9 @@
 # Roadmap
 
-## Current state (v0.2.1 — Local_Provider_Layer)
+## Current state (as of 2026-11-01 — Marketing_Workflow merged)
 
 - Clerk JWT authentication (RS256 / JWKS, `email_verified` enforced, lazy user creation)
-- Credit ledger — append-only `credits_ledger`, `SELECT FOR UPDATE` double-spend guard, 100k beta seed
+- Credit ledger — append-only `credits_ledger`; credits are charged upfront, atomically with the balance check, and reconciled afterwards (full refund on failure); concurrent requests are serialized per user in PostgreSQL; 100k beta seed
 - Per-plan LLM tier ceiling (free → haiku, pro → sonnet, enterprise → opus)
 - Content-policy billing — `rejected` status, base-cost-only charge, bypasses fallback chain
 - Per-user rolling rate limit (free: 10 jobs/hr, pro: 30, enterprise: 100) + `429 Retry-After`
@@ -13,8 +13,13 @@
 - TTS provider abstraction — `ITTSProvider` ABC, `FallbackTTSProvider`, `build_tts_chain()` factory
 - ElevenLabs → OpenAI TTS fallback chain (PROD default), Kokoro GPU-local tier (LOCAL mode)
 - `APP_MODE` routing: LOCAL (Kokoro only) / PROD (ElevenLabs → OpenAI) / DEBUG (Kokoro prepended)
-- 459 automated tests (10 skipped — GPU `local_models` marker, CI-safe)
-- Docker deployment with PostgreSQL (jobs) + SQLite (users, dev)
+- 940+ automated tests (opt-in suites for GPU models, live LLM calls and Postgres-specific behaviour are skipped by default)
+- Docker deployment with PostgreSQL for jobs and users (SQLite only for local dev and tests)
+- Character overlays (Nina / Tina / Narrator), mood-driven switching, frame overlays and contextual pop-in effects (`SMF_VFX_Creativity`)
+- Duration backstop — a script that runs long is trimmed so the rendered video stays within tolerance of the requested length
+- **Campaign format** (`Marketing_Workflow`): sectioned, bring-your-own-media videos — per-section context and uploaded images/videos, narration kept faithful to what the client supplied, section media as the background, cost reconciled to real usage; gated to the Pro and Enterprise plans
+- Per-user upload quota with automatic expiry of uploaded media; campaign jobs share the per-user hourly rate limit
+- Full dependency vulnerability audit and upgrade pass (image-decoding and HTTP stack), run before each merge
 
 ---
 
@@ -52,25 +57,49 @@ Multi-tenant SaaS infrastructure. Full auth flow live-tested end-to-end with Doc
 
 ---
 
-## Next: VFX Character Overlay
+### Script_Generator_Refactor (merged 2026-04-30)
 
-PNG character sprites (Nina, Tina, Narrator) composited into the final video. Mood-driven switching — 6 moods derived from segment SFX category, no additional AI calls.
+- One mode-aware script generator driven by theme configuration replaces per-style wrapper modules; new script styles no longer need new wiring
 
-**Status:** BRD drafted (`vfx_brd_draft.md`). Initial test assets received (2026-04-23). Full asset set needed: 18 total (6 moods × 3 characters). Branch scope is wide — full BRD required before implementation start.
+### Pipeline_Consolidation (merged 2026-05-07)
 
-**Dependency note:** SFX 2.0 character-aware sound mixing may depend on VFX landing first. SFX 2.0 scope will be limited or sequenced after VFX.
+- Single pipeline service shared by the API paths; `GET /v1/user/me`; structured-output hardening for LLM providers
+
+### SMF_VFX_Creativity (merged 2026-09-11)
+
+- Character overlays with mood-driven switching, frame overlays and contextual pop-in effects, gated by plan tier
+
+### Release_Hardening (merged 2026-10-18)
+
+- Credit double-spend closed: upfront atomic charge + reconciliation, serialized per user in PostgreSQL; verified against the live Docker stack
+- Duration backstop for scripts that overshoot the requested length
+- Users database wired to PostgreSQL in deployments, with a startup guard that refuses to boot production on SQLite
+- Output filename length cap; SFX database connectivity fix inside Docker
+
+### Marketing_Workflow (merged 2026-11-01)
+
+- Campaign format: sectioned bring-your-own-media videos with an upload endpoint, narration validated against the client's own context, per-section media backgrounds, and cost reconciliation (refund or capped top-up) after delivery
+- Abuse limits: shared hourly rate limit, per-user upload quota, hourly cleanup of expired uploads
+- Security pass: web-framework and image-library upgrades from a full dependency audit
+- Live-tested end to end against Docker with a real Clerk login
 
 ---
 
-## Near-term: Script Generator Consolidation
+## Next: Hardening
 
-`create_script_monologue.py` and `create_script_debate.py` are near-identical wrappers — every new script style requires a new file, new wiring, new factory changes.
+A small, dedicated hardening branch: security and data-integrity debt (credential rotation, auth-library migration, schema-migration tooling) plus two base-pipeline output-quality defects found during live testing (stray markup in generated narration, subtitle edge-safety).
 
-**Goal (`Script_Generator_Refactor` branch):**
-- Single mode-aware `ScriptGeneratorService` driven by `ThemeManager` / `ThemeConfig`
-- `RealScriptService` becomes a thin caller with no dispatch logic
-- Centralized voice registry (Nina/Tina/Narrator + theme → provider voice ID) — fixes the Narrator-for-all voice mapping regression (Claude LLM + default theme + top-5)
-- `refine_base_prompt.py` redesigned and renamed as part of this work
+---
+
+## Next: Voice & SFX Improvements
+
+Investigation first: a best-in-class **local** voice tier (cloned character voices at near-ElevenLabs quality) and **local sound-effect generation**, so the SFX layer no longer depends on a cloud provider or on library size. Licensing and GPU-in-Docker are gating questions.
+
+---
+
+## Next: Animated Backgrounds (investigation + proof of concept)
+
+Replace stock background footage with rendered, context-driven animations (motion graphics, images and GIFs timed to the narration). Text-to-video generation is explicitly out of scope — cost and content policy. Built on a long-lived integration branch and merged only once the result is clearly better.
 
 ---
 
@@ -92,7 +121,7 @@ PNG character sprites (Nina, Tina, Narrator) composited into the final video. Mo
 | Email notifications | Video ready + expiry reminder |
 | Stripe integration | Credit purchases via webhook → credits_ledger |
 | Subtitle karaoke | Character-level timing from ElevenLabs alignment API. Breaking change (TTS signature). Implement after VFX. |
-| SFX 2.0 | Per-theme mode tuning, weighted trait scoring, overuse thresholds. Sequenced after VFX. |
+| SFX 2.0 | Per-theme mode tuning, overuse thresholds. VFX has shipped; scope to be re-set alongside the Voice & SFX investigation. |
 | Fish-Speech TTS | High-fidelity local TTS with voice cloning. No stable PyPI release yet. Evaluate when available. |
 | MCP server | Read-only PostgreSQL access for Claude Code (`query_assets`, `query_tags`, `describe_table`). After auth sprint. |
 
