@@ -85,21 +85,23 @@ Multi-tenant SaaS infrastructure. Full auth flow live-tested end-to-end with Doc
 
 ---
 
-## Next: Hardening
-
-A small, dedicated hardening branch: security and data-integrity debt (credential rotation, auth-library migration, schema-migration tooling) plus two base-pipeline output-quality defects found during live testing (stray markup in generated narration, subtitle edge-safety).
-
----
-
 ## Next: Voice & SFX Improvements
 
-Investigation first: a best-in-class **local** voice tier (cloned character voices at near-ElevenLabs quality) and **local sound-effect generation**, so the SFX layer no longer depends on a cloud provider or on library size. Licensing and GPU-in-Docker are gating questions.
+**Phase 0 — two base-pipeline output-quality defects found during live testing:** stray markup in generated narration being read aloud by text-to-speech, and subtitles occasionally clipped at the screen edges. Each gets a failing test first.
+
+**Then, investigation first:** a best-in-class **local** voice tier (cloned character voices at near-ElevenLabs quality) and **local sound-effect generation**, so the SFX layer no longer depends on a cloud provider or on library size. Licensing and GPU-in-Docker are gating questions.
 
 ---
 
 ## Next: Animated Backgrounds (investigation + proof of concept)
 
 Replace stock background footage with rendered, context-driven animations (motion graphics, images and GIFs timed to the narration). Text-to-video generation is explicitly out of scope — cost and content policy. Built on a long-lived integration branch and merged only once the result is clearly better.
+
+---
+
+## Also planned: Security & data-integrity hardening
+
+A dedicated hardening branch for security and data-integrity debt (credential rotation, auth-library migration, schema-migration tooling, and a few transactional-safety improvements around credit charging). Sequencing relative to the sprints above is not yet fixed.
 
 ---
 
