@@ -1,6 +1,6 @@
 # Roadmap
 
-## Current state (as of 2026-11-01 — Marketing_Workflow merged)
+## Current state (as of 2026-11-04 — Hardening_Lite merged)
 
 - Clerk JWT authentication (RS256 / JWKS, `email_verified` enforced, lazy user creation)
 - Credit ledger — append-only `credits_ledger`; credits are charged upfront, atomically with the balance check, and reconciled afterwards (full refund on failure); concurrent requests are serialized per user in PostgreSQL; 100k beta seed
@@ -13,11 +13,12 @@
 - TTS provider abstraction — `ITTSProvider` ABC, `FallbackTTSProvider`, `build_tts_chain()` factory
 - ElevenLabs → OpenAI TTS fallback chain (PROD default), Kokoro GPU-local tier (LOCAL mode)
 - `APP_MODE` routing: LOCAL (Kokoro only) / PROD (ElevenLabs → OpenAI) / DEBUG (Kokoro prepended)
-- 940+ automated tests (opt-in suites for GPU models, live LLM calls and Postgres-specific behaviour are skipped by default)
+- 1,100+ automated tests (opt-in suites for GPU models, live LLM calls and Postgres-specific behaviour are skipped by default)
 - Docker deployment with PostgreSQL for jobs and users (SQLite only for local dev and tests)
 - Character overlays (Nina / Tina / Narrator), mood-driven switching, frame overlays and contextual pop-in effects (`SMF_VFX_Creativity`)
 - Duration backstop — a script that runs long is trimmed so the rendered video stays within tolerance of the requested length
 - **Campaign format** (`Marketing_Workflow`): sectioned, bring-your-own-media videos — per-section context and uploaded images/videos, narration kept faithful to what the client supplied, section media as the background, cost reconciled to real usage; gated to the Pro and Enterprise plans
+- Narration is guaranteed plain text before it reaches text-to-speech, and subtitles are fitted to the frame by measurement (`Hardening_Lite`)
 - Per-user upload quota with automatic expiry of uploaded media; campaign jobs share the per-user hourly rate limit
 - Full dependency vulnerability audit and upgrade pass (image-decoding and HTTP stack), run before each merge
 
@@ -83,13 +84,19 @@ Multi-tenant SaaS infrastructure. Full auth flow live-tested end-to-end with Doc
 - Security pass: web-framework and image-library upgrades from a full dependency audit
 - Live-tested end to end against Docker with a real Clerk login
 
+### Hardening_Lite (merged 2026-11-04)
+
+- Output quality: stray markup can no longer be read aloud by text-to-speech; subtitles always fit inside the frame (wrap, then shrink, then break as a last resort)
+- Money-path safety: refunds are issued before a failed job's final status is written, so a status-write failure can no longer swallow a refund; unknown campaign media references are rejected at submit time, before any charge
+- Database credentials are always redacted in logs
+- Dead-code and unused-import cleanup; the test suite no longer leaves renders behind
+- Live-tested end to end against Docker with a real Clerk login
+
 ---
 
 ## Next: Voice & SFX Improvements
 
-**Phase 0 — two base-pipeline output-quality defects found during live testing:** stray markup in generated narration being read aloud by text-to-speech, and subtitles occasionally clipped at the screen edges. Each gets a failing test first.
-
-**Then, investigation first:** a best-in-class **local** voice tier (cloned character voices at near-ElevenLabs quality) and **local sound-effect generation**, so the SFX layer no longer depends on a cloud provider or on library size. Licensing and GPU-in-Docker are gating questions.
+**Investigation first:** a best-in-class **local** voice tier (cloned character voices at near-ElevenLabs quality) and **local sound-effect generation**, so the SFX layer no longer depends on a cloud provider or on library size. Licensing and GPU-in-Docker are gating questions.
 
 ---
 

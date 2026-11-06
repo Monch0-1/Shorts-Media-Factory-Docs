@@ -185,9 +185,10 @@ Queue a campaign video. Returns `202` with a `job_id`; poll `GET /v1/video/statu
 - Narration must stay faithful to the supplied context — sections that drift are reworked before audio is generated
 - Video length is emergent (driven by the narration), not requested; a maximum applies
 - Credits are charged upfront, then reconciled to the real cost after delivery (refund, or a top-up capped at the user's balance). Any failure on our side is a full refund
-- Media may only reference the caller's own uploads (`asset_id`); anything else is rejected with `422`
+- Media may only reference the caller's own uploads (`asset_id`); server-side file references are rejected with `422 filename_refs_not_allowed`
+- Every `asset_id` is checked at submit time, before rate limiting or any charge: an id that is not one of the caller's uploads returns `400 unknown_asset_id` (with the offending `asset_id` and `section` index)
 
-Errors: `402` insufficient credits, `403` plan / not enabled / tier ceiling, `422` invalid request, `429` rate limit (shared with `/v1/video/generate`).
+Errors: `400 unknown_asset_id`, `402` insufficient credits, `403` plan / not enabled / tier ceiling, `422` invalid request, `429` rate limit (shared with `/v1/video/generate`).
 
 ---
 

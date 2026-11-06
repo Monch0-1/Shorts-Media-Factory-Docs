@@ -80,6 +80,8 @@ The topic and theme are passed to the script generator. The theme drives:
 
 The generator returns a structured script: a sequence of segments, each with a speaker, line of dialogue, and an optional sound effect cue.
 
+Every line is guaranteed to be plain spoken text before it reaches text-to-speech or subtitles — any formatting markup in the generated script is removed, so it is never read aloud.
+
 ---
 
 ## Step 3 — Audio Synthesis
@@ -108,7 +110,7 @@ All assets are composited into the final video:
 - Background video is selected from the theme's asset pool and trimmed or looped to match the total audio duration
 - Background music is mixed with the voice track at the theme's configured volume level
 - SFX events are mixed into the master audio at their computed timestamps
-- Subtitles are rendered as PIL images and composited as timed ImageClips
+- Subtitles are rendered as PIL images and composited as timed ImageClips; each subtitle is measured and fitted to the frame (wrapped, then shrunk, then broken mid-word only as a last resort)
 - FFmpeg renders the final MP4 at target quality settings
 
 ---
