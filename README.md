@@ -16,6 +16,8 @@ The human acts as Creative Director. The AI handles the production friction.
 
 One API call. One video. No editing software required.
 
+A second format, **campaigns**, lets a client bring their own media and per-section context and get a narrated video that stays faithful to what they supplied.
+
 ---
 
 ## Market validation
@@ -36,7 +38,7 @@ The market is not looking for AI-generated noise. It is looking for high-quality
 | Video assembly | MoviePy + FFmpeg |
 | Job state | PostgreSQL (SQLModel) |
 | Infrastructure | Docker + docker-compose |
-| Auth (roadmap) | Clerk / Supabase JWT |
+| Auth | Clerk JWT |
 
 ---
 

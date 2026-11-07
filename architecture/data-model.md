@@ -16,6 +16,7 @@ JobRecord
 ├── credits_cost    int               — credits charged for this job (0 on failure)
 ├── output_path     str (nullable)    — local path; cleared on expiry
 ├── error_message   str (nullable)    — capped at 1000 chars
+├── campaign_cost_json str (nullable) — campaign jobs: LLM calls/usage, rework rounds, rendered duration, real cost
 ├── created_at      datetime (UTC)
 ├── updated_at      datetime (UTC)
 └── expires_at      datetime (UTC)    — created_at + VIDEO_RETENTION_HOURS
@@ -100,7 +101,7 @@ CreditLedgerEntry
 ├── id          uuid (PK)
 ├── user_id     FK → UserRecord.id
 ├── delta       int              — positive for credits in, negative for usage
-├── reason      str              — "beta_seed" | "video_generation" | "content_policy_rejection" | "stripe_purchase"
+├── reason      str              — "beta_seed" | "video_generation" | "campaign_generation" | "campaign_reconciliation_refund" | "campaign_reconciliation_charge" | "campaign_failed_refund" | "campaign_content_policy_refund" | "content_policy_rejection" | "stripe_purchase"
 ├── job_id      str (nullable)   — FK → JobRecord.id; set for generation/rejection entries
 └── created_at  datetime (UTC)
 ```
@@ -118,4 +119,4 @@ Jobs and users live in separate databases with no cross-database foreign keys. T
 | Database | Contents | Dev default |
 |---|---|---|
 | Jobs DB | `JobRecord` | PostgreSQL (`jobs` service in Docker) |
-| Users DB | `UserRecord`, `CreditLedgerEntry` | SQLite (`users.db`) |
+| Users DB | `UserRecord`, `CreditLedgerEntry` | PostgreSQL in deployments (SQLite for local dev and tests) |

@@ -80,6 +80,8 @@ The topic and theme are passed to the script generator. The theme drives:
 
 The generator returns a structured script: a sequence of segments, each with a speaker, line of dialogue, and an optional sound effect cue.
 
+Every line is guaranteed to be plain spoken text before it reaches text-to-speech or subtitles — any formatting markup in the generated script is removed, so it is never read aloud.
+
 ---
 
 ## Step 3 — Audio Synthesis
@@ -108,7 +110,7 @@ All assets are composited into the final video:
 - Background video is selected from the theme's asset pool and trimmed or looped to match the total audio duration
 - Background music is mixed with the voice track at the theme's configured volume level
 - SFX events are mixed into the master audio at their computed timestamps
-- Subtitles are rendered as PIL images and composited as timed ImageClips
+- Subtitles are rendered as PIL images and composited as timed ImageClips; each subtitle is measured and fitted to the frame (wrapped, then shrunk, then broken mid-word only as a last resort)
 - FFmpeg renders the final MP4 at target quality settings
 
 ---
@@ -118,6 +120,19 @@ All assets are composited into the final video:
 The output file is verified to exist. If it does, the `JobRecord` is updated to `completed` with the output path stored. If it does not exist (pipeline returned without writing), the job transitions to `failed`.
 
 The download URL becomes available. The video is retained for `VIDEO_RETENTION_HOURS` (default 72h), after which the file is deleted and the job transitions to `expired`.
+
+---
+
+## Campaign Workflow (bring-your-own media)
+
+The campaign format (`POST /v1/campaign/generate`) reuses the same audio, VFX and render stages, with a different front half and background:
+
+1. **Validate and charge** — plan and access gate, rate limit, then an atomic upfront credit charge
+2. **Resolve and probe media** — every referenced upload is content-checked before any paid call, so a bad asset fails fast
+3. **Section-aware script** — narration is generated for all sections at once, then checked against each section's own context; drifting sections are reworked
+4. **Audio** — the same voice and SFX stages as the topic workflow
+5. **Section backgrounds** — each section's media is timed to that section's narration; images and videos are framed for vertical output without cropping landscape sources
+6. **Render and reconcile** — final render, then the upfront charge is reconciled against real cost; a failure at any stage refunds in full
 
 ---
 
